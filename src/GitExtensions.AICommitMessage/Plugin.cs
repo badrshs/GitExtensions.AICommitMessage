@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Drawing;
+using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using GitExtensions.Extensibility.Git;
@@ -12,16 +14,19 @@ using GitUIPluginInterfaces;
 namespace GitExtensions.AICommitMessage
 {
     /// <summary>
-    /// Adds a "Generate AI commit message" button to the commit dialog. When clicked, the staged diff
-    /// is sent to a user-configured OpenAI-compatible endpoint and the returned message is inserted.
-    /// The feature is OFF by default and the diff leaves the machine only on an explicit click.
+    /// Adds an "AI message" button to the Commit dialog toolbar (next to "Commit templates").
+    /// Clicking it sends the staged diff to a user-configured OpenAI-compatible endpoint and puts the
+    /// suggested message in the commit box. The feature is OFF by default and the diff is sent ONLY
+    /// on an explicit click — never when the dialog opens or a menu is browsed.
     /// </summary>
     [Export(typeof(IGitPlugin))]
     [Export(typeof(IGitPluginForCommit))]
     [Export(typeof(IGitPluginForRepository))]
     public sealed class Plugin : GitPluginBase, IGitPluginForRepository, IGitPluginForCommit
     {
-        private const string TemplateTitle = "✨ Generate AI commit message";
+        private const string Title = "AI commit message";
+        private const string ButtonName = "aiCommitMessageButton";
+        private const string ButtonText = "✨ AI message";
 
         private const string DefaultSystemPrompt =
             "You are a senior software engineer writing a git commit message for a staged diff. " +
@@ -38,7 +43,7 @@ namespace GitExtensions.AICommitMessage
         private readonly NumberSetting<int> _maxDiffChars = new("Max diff characters", "Max diff characters sent to the model (0 = no limit)", 12000);
 
         private IGitModule? _module;
-        private bool _templateAdded;
+        private bool _idleHooked;
 
         public Plugin()
             : base(hasSettings: true)
@@ -63,25 +68,26 @@ namespace GitExtensions.AICommitMessage
             base.Register(gitUiCommands);
             _module = gitUiCommands.Module;
             gitUiCommands.PreCommit += OnPreCommit;
-            gitUiCommands.PostCommit += OnPostRepositoryChanged;
-            gitUiCommands.PostRepositoryChanged += OnPostRepositoryChanged;
+            gitUiCommands.PostCommit += OnPostCommit;
         }
 
         public override void Unregister(IGitUICommands gitUiCommands)
         {
             gitUiCommands.PreCommit -= OnPreCommit;
-            gitUiCommands.PostCommit -= OnPostRepositoryChanged;
-            gitUiCommands.PostRepositoryChanged -= OnPostRepositoryChanged;
+            gitUiCommands.PostCommit -= OnPostCommit;
+            UnhookIdle();
             base.Unregister(gitUiCommands);
         }
 
-        /// <summary>Invoked from the Plugins menu — just open the settings page.</summary>
+        /// <summary>Plugins menu entry — just open the settings page.</summary>
         public override bool Execute(GitUIEventArgs args)
         {
             args.GitUICommands.StartSettingsDialog(this);
             return false;
         }
 
+        // PreCommit fires right before the Commit dialog is created. We can't touch the form yet, so we
+        // wait for the app to go idle (the form is shown by then) and inject the button into its toolbar.
         private void OnPreCommit(object? sender, GitUIEventArgs e)
         {
             if (!_enabled.ValueOrDefault(Settings))
@@ -89,66 +95,150 @@ namespace GitExtensions.AICommitMessage
                 return;
             }
 
-            // The Func<string> runs only when the user clicks the button in the commit dialog,
-            // so nothing is sent to the AI until that explicit action.
-            e.GitUICommands.AddCommitTemplate(TemplateTitle, GenerateCommitMessage, Icon);
-            _templateAdded = true;
+            HookIdle();
         }
 
-        private void OnPostRepositoryChanged(object? sender, GitUIEventArgs e)
+        private void OnPostCommit(object? sender, GitUIPostActionEventArgs e) => UnhookIdle();
+
+        private void HookIdle()
         {
-            if (_templateAdded)
+            if (_idleHooked)
             {
-                e.GitUICommands.RemoveCommitTemplate(TemplateTitle);
-                _templateAdded = false;
+                return;
+            }
+
+            _idleHooked = true;
+            Application.Idle += OnApplicationIdle;
+        }
+
+        private void UnhookIdle()
+        {
+            if (!_idleHooked)
+            {
+                return;
+            }
+
+            _idleHooked = false;
+            Application.Idle -= OnApplicationIdle;
+        }
+
+        private void OnApplicationIdle(object? sender, EventArgs e)
+        {
+            Form? form = FindOpenForm("FormCommit");
+            if (form is null)
+            {
+                return; // dialog not visible yet — try again on the next idle
+            }
+
+            UnhookIdle();
+            try
+            {
+                InjectButton(form);
+            }
+            catch
+            {
+                // Best effort: if the toolbar layout changed in this GE build, just skip the button.
             }
         }
 
-        private string GenerateCommitMessage()
+        private void InjectButton(Form form)
         {
-            Cursor? previous = Cursor.Current;
+            ToolStripItem? templatesItem = GetMember(form, "commitTemplatesToolStripMenuItem") as ToolStripItem;
+            ToolStrip? host = GetMember(form, "toolbarCommit") as ToolStrip;
+
+            int insertIndex = -1;
+            if (host is not null && templatesItem is not null)
+            {
+                int idx = host.Items.IndexOf(templatesItem);
+                if (idx >= 0)
+                {
+                    insertIndex = idx + 1;
+                }
+            }
+
+            host ??= AllControls(form).OfType<ToolStrip>()
+                        .FirstOrDefault(ts => templatesItem is not null && ts.Items.Contains(templatesItem))
+                     ?? AllControls(form).OfType<ToolStrip>().FirstOrDefault();
+
+            if (host is null)
+            {
+                return;
+            }
+
+            // Avoid adding a second button if this form was already processed.
+            if (host.Items.Cast<ToolStripItem>().Any(i => i.Name == ButtonName))
+            {
+                return;
+            }
+
+            ToolStripButton button = new()
+            {
+                Name = ButtonName,
+                Text = ButtonText,
+                Image = Icon,
+                DisplayStyle = ToolStripItemDisplayStyle.ImageAndText,
+                ToolTipText = "Generate a commit message from the staged diff"
+            };
+            button.Click += async (_, _) => await OnGenerateClickedAsync(form, button).ConfigureAwait(true);
+
+            if (insertIndex >= 0 && insertIndex <= host.Items.Count)
+            {
+                host.Items.Insert(insertIndex, button);
+            }
+            else
+            {
+                host.Items.Add(button);
+            }
+        }
+
+        private async Task OnGenerateClickedAsync(Form form, ToolStripButton button)
+        {
+            string? workingDir = _module?.WorkingDir;
+            if (string.IsNullOrEmpty(workingDir))
+            {
+                return;
+            }
+
+            // Read settings on the UI thread.
+            string baseUrl = _baseUrl.ValueOrDefault(Settings);
+            string model = _model.ValueOrDefault(Settings);
+            string apiKey = _apiKey.ValueOrDefault(Settings);
+            string systemPrompt = _systemPrompt.ValueOrDefault(Settings);
+            if (string.IsNullOrWhiteSpace(systemPrompt))
+            {
+                systemPrompt = DefaultSystemPrompt;
+            }
+
+            int maxChars = _maxDiffChars.ValueOrDefault(Settings);
+
+            string? originalText = button.Text;
+            button.Enabled = false;
+            button.Text = "Generating…";
             try
             {
-                Cursor.Current = Cursors.WaitCursor;
-
-                string? workingDir = _module?.WorkingDir;
-                if (string.IsNullOrEmpty(workingDir))
+                // Off the UI thread; the continuation resumes on the UI thread to update the form.
+                string message = await Task.Run(() => GenerateAsync(workingDir!, baseUrl, apiKey, model, systemPrompt, maxChars));
+                if (!string.IsNullOrEmpty(message))
                 {
-                    return string.Empty;
+                    SetCommitMessage(form, message);
                 }
-
-                string baseUrl = _baseUrl.ValueOrDefault(Settings);
-                string model = _model.ValueOrDefault(Settings);
-                string apiKey = _apiKey.ValueOrDefault(Settings);
-                string systemPrompt = _systemPrompt.ValueOrDefault(Settings);
-                if (string.IsNullOrWhiteSpace(systemPrompt))
-                {
-                    systemPrompt = DefaultSystemPrompt;
-                }
-
-                int maxChars = _maxDiffChars.ValueOrDefault(Settings);
-
-                // Run off the UI thread; ConfigureAwait(false) throughout avoids a UI-thread deadlock.
-                return Task.Run(() => GenerateAsync(workingDir!, baseUrl, apiKey, model, systemPrompt, maxChars))
-                           .GetAwaiter().GetResult();
             }
             catch (NoStagedChangesException)
             {
-                MessageBox.Show(
-                    "No staged changes were found. Stage the files you want to commit, then click the button again.",
-                    TemplateTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return string.Empty;
+                MessageBox.Show(form,
+                    "No staged changes were found. Stage the files you want to commit, then click again.",
+                    Title, MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
+                MessageBox.Show(form,
                     "Failed to generate a commit message:\n\n" + ex.Message,
-                    TemplateTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return string.Empty;
+                    Title, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
-                Cursor.Current = previous;
+                button.Text = originalText;
+                button.Enabled = true;
             }
         }
 
@@ -167,6 +257,57 @@ namespace GitExtensions.AICommitMessage
 
             OpenAiClient client = new(baseUrl, apiKey, model);
             return await client.CompleteAsync(systemPrompt, diff).ConfigureAwait(false);
+        }
+
+        // Sets the commit message using FormCommit's own ReplaceMessage(string), falling back to Message.Text.
+        private static void SetCommitMessage(Form form, string message)
+        {
+            MethodInfo? replace = form.GetType().GetMethod(
+                "ReplaceMessage",
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+                binder: null, types: new[] { typeof(string) }, modifiers: null);
+            if (replace is not null)
+            {
+                replace.Invoke(form, new object[] { message });
+                return;
+            }
+
+            if (GetMember(form, "Message") is Control messageControl)
+            {
+                messageControl.Text = message;
+                messageControl.Focus();
+            }
+        }
+
+        private static object? GetMember(Form form, string name)
+        {
+            FieldInfo? field = form.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            return field?.GetValue(form);
+        }
+
+        private static Form? FindOpenForm(string typeName)
+        {
+            foreach (Form f in Application.OpenForms)
+            {
+                if (f.GetType().Name == typeName && f.Visible && !f.IsDisposed)
+                {
+                    return f;
+                }
+            }
+
+            return null;
+        }
+
+        private static IEnumerable<Control> AllControls(Control root)
+        {
+            foreach (Control child in root.Controls)
+            {
+                yield return child;
+                foreach (Control descendant in AllControls(child))
+                {
+                    yield return descendant;
+                }
+            }
         }
 
         private static Image? LoadIcon()
