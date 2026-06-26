@@ -1,0 +1,60 @@
+name: Publish to NuGet
+
+# Publishes the plugin to nuget.org when you push a version tag, e.g.:
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# Prerequisite: add a repository secret named NUGET_PUSH_TOKEN
+# (Settings -> Secrets and variables -> Actions -> New repository secret)
+# containing a nuget.org API key allowed to push packages.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # CI runners don't have Git Extensions installed, so fetch the matching
+      # binaries (the plugin compiles against them; they are not redistributed).
+      - name: Download Git Extensions 5.2.1 binaries
+        shell: pwsh
+        run: |
+          $url = "https://github.com/gitextensions/gitextensions/releases/download/v5.2.1/GitExtensions-Portable-x64-5.2.1.18061-0d74cfdc3.zip"
+          Invoke-WebRequest -Uri $url -OutFile ge.zip
+          Expand-Archive -Path ge.zip -DestinationPath ge -Force
+          $dll = Get-ChildItem -Path ge -Recurse -Filter GitExtensions.Extensibility.dll | Select-Object -First 1
+          if (-not $dll) { throw "GitExtensions.Extensibility.dll not found in the portable archive" }
+          "GE_PATH=$($dll.Directory.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "GE_PATH = $($dll.Directory.FullName)"
+
+      - name: Pack
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          Write-Host "Packing version $version"
+          dotnet pack src/GitExtensions.AICommitMessage/GitExtensions.AICommitMessage.csproj `
+            -c Release `
+            -p:GitExtensionsPath="$env:GE_PATH" `
+            -p:Version=$version
+
+      - name: Push to nuget.org
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          $pkg = "src/GitExtensions.AICommitMessage/bin/Release/GitExtensions.AICommitMessage.$version.nupkg"
+          dotnet nuget push $pkg -k "${{ secrets.NUGET_PUSH_TOKEN }}" -s https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: src/GitExtensions.AICommitMessage/bin/Release/*.nupkg

@@ -78,15 +78,38 @@ dotnet build ... -c Release -p:GitExtensionsPath="D:\path\to\GitExtensions"
 Those host assemblies are referenced with `Private=false`, so the build output is just the plugin
 DLL — Git Extensions provides the rest at runtime.
 
-## Package & publish
+## Install from NuGet (other machines)
+
+Once published, the package depends on `GitExtensions.Extensibility` — the marker the Git Extensions
+**Plugin Manager** uses to discover plugins. On another machine you can either:
+
+- open Git Extensions → **Plugins → Plugin Manager**, find **AI Commit Message**, and install it; or
+- download the `.nupkg` from [nuget.org](https://www.nuget.org/packages/GitExtensions.AICommitMessage),
+  rename it to `.zip`, and copy the `lib/GitExtensions.AICommitMessage.dll` into your
+  `%LOCALAPPDATA%\GitExtensions\UserPlugins\` folder.
+
+## Releasing to NuGet
+
+Publishing is automated by [`.github/workflows/release.yml`](.github/workflows/release.yml):
+
+1. Add a repository secret **`NUGET_PUSH_TOKEN`** (a [nuget.org](https://www.nuget.org/) API key allowed to push).
+2. Tag a version and push it:
+
+   ```sh
+   git tag v0.1.0
+   git push origin v0.1.0
+   ```
+
+The workflow fetches the matching Git Extensions binaries, packs the plugin, and pushes it to nuget.org.
+
+To build the package locally instead:
 
 ```sh
 dotnet pack src/GitExtensions.AICommitMessage/GitExtensions.AICommitMessage.csproj -c Release
+# then, with your own key:
+dotnet nuget push src/GitExtensions.AICommitMessage/bin/Release/GitExtensions.AICommitMessage.0.1.0.nupkg \
+  -k <YOUR_NUGET_API_KEY> -s https://api.nuget.org/v3/index.json
 ```
-
-This produces a `.nupkg` that depends on `GitExtensions.Extensibility` — the marker the Git Extensions
-**Plugin Manager** uses to discover plugins. Publish it to [nuget.org](https://www.nuget.org/) to make
-it installable from the Plugin Manager.
 
 ## How it works
 
