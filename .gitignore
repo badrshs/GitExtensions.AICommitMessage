@@ -1,0 +1,10 @@
+## .NET / Visual Studio
+bin/
+obj/
+.vs/
+*.user
+artifacts/
+*.nupkg
+
+## Rider
+.idea/

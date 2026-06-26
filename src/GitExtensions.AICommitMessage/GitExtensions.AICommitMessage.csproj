@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- GitExtensions 5.2.x runs on net8.0 (WindowsDesktop). The plugin must match the host runtime. -->
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>GitExtensions.AICommitMessage</RootNamespace>
+    <AssemblyName>GitExtensions.AICommitMessage</AssemblyName>
+    <Version>0.1.0</Version>
+    <Authors>Badr Aldeen</Authors>
+    <Description>Git Extensions plugin that generates a commit message from the staged diff via an OpenAI-compatible API. Off by default — the diff is sent only when you click the button.</Description>
+    <PackageProjectUrl>https://github.com/badrshs/GitExtensions.AICommitMessage</PackageProjectUrl>
+    <PackageTags>GitExtensions</PackageTags>
+
+    <!-- Path to the installed Git Extensions whose assemblies we compile against.
+         Override on the command line with -p:GitExtensionsPath=... if installed elsewhere. -->
+    <GitExtensionsPath Condition="'$(GitExtensionsPath)' == ''">C:\Program Files\GitExtensions</GitExtensionsPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\icon.png" />
+  </ItemGroup>
+
+  <!-- MEF: the [Export] attributes must match the host's copy → reference GE's bundled assembly, do not copy it. -->
+  <ItemGroup>
+    <Reference Include="System.ComponentModel.Composition">
+      <HintPath>$(GitExtensionsPath)\System.ComponentModel.Composition.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GitExtensions.Extensibility">
+      <HintPath>$(GitExtensionsPath)\GitExtensions.Extensibility.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GitUIPluginInterfaces">
+      <HintPath>$(GitExtensionsPath)\GitUIPluginInterfaces.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GitCommands">
+      <HintPath>$(GitExtensionsPath)\GitCommands.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GitExtUtils">
+      <HintPath>$(GitExtensionsPath)\GitExtUtils.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ResourceManager">
+      <HintPath>$(GitExtensionsPath)\ResourceManager.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Pack as .nupkg with a dependency on GitExtensions.Extensibility (the Plugin Manager discovery marker). -->
+  <PropertyGroup>
+    <NuspecFile>$(MSBuildThisFileDirectory)GitExtensions.AICommitMessage.nuspec</NuspecFile>
+  </PropertyGroup>
+
+  <Target Name="SetPackageProperties" BeforeTargets="GenerateNuspec">
+    <PropertyGroup>
+      <NuspecProperties>version=$(Version);targetDir=$(TargetDir)</NuspecProperties>
+    </PropertyGroup>
+  </Target>
+
+</Project>

@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Git Extensions (debug plugin)": {
+      "commandName": "Executable",
+      "executablePath": "C:\\Program Files\\GitExtensions\\GitExtensions.exe",
+      "comment": "F5 launches the installed Git Extensions with this plugin's DLL on the debugger. Build first, then copy bin output to the Plugins folder (see README), or point GE at the build output."
+    }
+  }
+}

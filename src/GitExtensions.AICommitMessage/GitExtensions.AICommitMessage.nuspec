@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>GitExtensions.AICommitMessage</id>
+    <version>$version$</version>
+    <authors>Badr Aldeen</authors>
+    <description>Git Extensions plugin that generates a commit message from the staged diff via an OpenAI-compatible API. Off by default; the diff is sent only when you click the button.</description>
+    <projectUrl>https://github.com/badrshs/GitExtensions.AICommitMessage</projectUrl>
+    <icon>Resources\icon.png</icon>
+    <readme>README.md</readme>
+    <tags>GitExtensions</tags>
+    <!-- The dependency on GitExtensions.Extensibility is the marker the Plugin Manager uses to discover plugins. -->
+    <dependencies>
+      <dependency id="GitExtensions.Extensibility" version="[0.1.0, 1.0.0)" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="$targetDir$GitExtensions.AICommitMessage.dll" target="/lib" />
+    <file src="$targetDir$GitExtensions.AICommitMessage.pdb" target="/lib" />
+    <file src="Resources\icon.png" target="\Resources\" />
+    <file src="..\..\LICENSE.md" target="\" />
+    <file src="..\..\README.md" target="\" />
+  </files>
+</package>
