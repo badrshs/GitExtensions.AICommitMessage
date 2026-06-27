@@ -1,7 +1,7 @@
 name: Publish to NuGet
 
 # Publishes the plugin to nuget.org when you push a version tag, e.g.:
-#   git tag v0.1.0 && git push origin v0.1.0
+#   git tag v0.2.0 && git push origin v0.2.0
 #
 # Authentication uses nuget.org Trusted Publishing (OIDC) — no stored API key.
 # Prerequisites (one-time):
@@ -27,17 +27,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 8
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       # CI runners don't have Git Extensions installed, so fetch the matching
       # binaries (the plugin compiles against them; they are not redistributed).
-      - name: Download Git Extensions 5.2.1 binaries
+      # Must match the host generation the plugin targets: GE 7.x (.NET 10, Extensibility 7.0).
+      - name: Download Git Extensions 7.0.1 binaries
         shell: pwsh
         run: |
-          $url = "https://github.com/gitextensions/gitextensions/releases/download/v5.2.1/GitExtensions-Portable-x64-5.2.1.18061-0d74cfdc3.zip"
+          $url = "https://github.com/gitextensions/gitextensions/releases/download/v7.0.1/GitExtensions-Portable-x64-7.0.1.86-c119a52.zip"
           Invoke-WebRequest -Uri $url -OutFile ge.zip
           Expand-Archive -Path ge.zip -DestinationPath ge -Force
           $dll = Get-ChildItem -Path ge -Recurse -Filter GitExtensions.Extensibility.dll | Select-Object -First 1
