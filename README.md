@@ -90,19 +90,25 @@ Once published, the package depends on `GitExtensions.Extensibility` — the mar
 
 ## Releasing to NuGet
 
-Publishing is automated by [`.github/workflows/release.yml`](.github/workflows/release.yml):
+Publishing is automated by [`.github/workflows/release.yml`](.github/workflows/release.yml) using
+nuget.org **Trusted Publishing** (OIDC — no stored API key to manage). One-time setup:
 
-1. Create a [nuget.org](https://www.nuget.org/) API key with the **Push** scope (glob pattern `*`),
-   then add it to this repo as an Actions **secret** named **`NUGET_PUSH_TOKEN`**
-   (Settings → Secrets and variables → Actions → New repository secret).
-2. Tag a version and push it:
+1. On nuget.org → **Trusted Publishing**, add a policy:
+   - **Repository Owner:** `badrshs`
+   - **Repository:** `GitExtensions.AICommitMessage`
+   - **Workflow File:** `release.yml`
+   - **Environment:** *(leave blank)*
+2. In this GitHub repo, add an Actions **variable** `NUGET_USER` set to your nuget.org username
+   (Settings → Secrets and variables → Actions → **Variables** → New repository variable).
+3. Tag a version and push it:
 
    ```sh
    git tag v0.1.0
    git push origin v0.1.0
    ```
 
-The workflow fetches the matching Git Extensions binaries, packs the plugin, and pushes to nuget.org.
+The workflow fetches the matching Git Extensions binaries, packs the plugin, obtains a short-lived
+key via OIDC, and pushes to nuget.org.
 
 To build the package locally instead:
 

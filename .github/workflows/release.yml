@@ -3,9 +3,15 @@ name: Publish to NuGet
 # Publishes the plugin to nuget.org when you push a version tag, e.g.:
 #   git tag v0.1.0 && git push origin v0.1.0
 #
-# Prerequisite (one-time): add a repository secret named NUGET_PUSH_TOKEN
-# (Settings -> Secrets and variables -> Actions -> New repository secret)
-# containing a nuget.org API key with the "Push" scope.
+# Authentication uses nuget.org Trusted Publishing (OIDC) — no stored API key.
+# Prerequisites (one-time):
+#   1. On nuget.org -> Trusted Publishing, add a policy:
+#        Repository Owner: badrshs
+#        Repository:       GitExtensions.AICommitMessage
+#        Workflow File:    release.yml
+#        Environment:      (leave blank)
+#   2. In this GitHub repo, add an Actions VARIABLE named NUGET_USER set to your
+#      nuget.org username (your profile name, NOT your email).
 
 on:
   push:
@@ -15,6 +21,9 @@ on:
 jobs:
   publish:
     runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write   # required for NuGet Trusted Publishing (OIDC)
     steps:
       - uses: actions/checkout@v4
 
@@ -46,12 +55,19 @@ jobs:
             -p:GitExtensionsPath="$env:GE_PATH" `
             -p:Version=$version
 
+      # Trusted Publishing keys are valid for 1 hour, so request it right before pushing.
+      - name: NuGet login (OIDC -> temporary API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ vars.NUGET_USER }}
+
       - name: Push to nuget.org
         shell: pwsh
         run: |
           $version = "${{ github.ref_name }}".TrimStart('v')
           $pkg = "src/GitExtensions.AICommitMessage/bin/Release/GitExtensions.AICommitMessage.$version.nupkg"
-          dotnet nuget push $pkg -k "${{ secrets.NUGET_PUSH_TOKEN }}" -s https://api.nuget.org/v3/index.json --skip-duplicate
+          dotnet nuget push $pkg --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
