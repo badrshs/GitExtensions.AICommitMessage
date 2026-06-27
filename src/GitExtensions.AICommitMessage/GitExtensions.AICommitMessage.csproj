@@ -9,7 +9,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>GitExtensions.AICommitMessage</RootNamespace>
     <AssemblyName>GitExtensions.AICommitMessage</AssemblyName>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Authors>Badr Aldeen</Authors>
     <Description>Git Extensions plugin that generates a commit message from the staged diff via an OpenAI-compatible API. Off by default — the diff is sent only when you click the button.</Description>
     <PackageProjectUrl>https://github.com/badrshs/GitExtensions.AICommitMessage</PackageProjectUrl>

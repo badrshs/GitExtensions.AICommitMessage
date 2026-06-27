@@ -29,11 +29,26 @@ namespace GitExtensions.AICommitMessage
         private const string ButtonText = "✨ AI message";
 
         private const string DefaultSystemPrompt =
-            "You are a senior software engineer writing a git commit message for a staged diff. " +
-            "Produce a Conventional Commits style message: a concise imperative subject line (<= 72 chars), " +
-            "then a blank line, then a short body that explains WHAT changed and, more importantly, WHY. " +
-            "Infer intent from the diff; do not invent facts. " +
-            "Output only the raw commit message text — no markdown code fences, no surrounding quotes, no commentary.";
+            "You are a senior software engineer writing a git commit message for the staged diff.\n" +
+            "\n" +
+            "Write the message in this exact shape:\n" +
+            "\n" +
+            "1. Subject line: imperative mood, at most 50 characters, no trailing period.\n" +
+            "   Use a Conventional Commits prefix when it fits the change, one of:\n" +
+            "   feat, fix, refactor, docs, test, chore, perf, build, ci\n" +
+            "   (example: \"fix: prevent crash when staging an empty file\").\n" +
+            "2. Then exactly one blank line.\n" +
+            "3. Body: explain WHAT changed and, above all, WHY it changed. Hard-wrap\n" +
+            "   every body line at 72 characters. Use \"- \" bullet points when there\n" +
+            "   are several distinct changes.\n" +
+            "\n" +
+            "Guidelines:\n" +
+            "- Infer the intent from the diff; never invent changes that aren't there.\n" +
+            "- For a small, self-explanatory change, a subject line alone is fine.\n" +
+            "- Be concise and specific; avoid filler like \"updated some code\".\n" +
+            "\n" +
+            "Output ONLY the raw commit message text: no markdown, no code fences, no\n" +
+            "surrounding quotes, and no commentary before or after it.";
 
         private readonly BoolSetting _enabled = new("Enabled", "Enable AI commit message generation", false);
         private readonly StringSetting _baseUrl = new("API base URL", "API base URL (OpenAI-compatible, e.g. https://api.openai.com/v1 or http://localhost:11434/v1)", "https://api.openai.com/v1");
@@ -60,6 +75,16 @@ namespace GitExtensions.AICommitMessage
             yield return _model;
             yield return _apiKey;
             yield return _maxDiffChars;
+
+            // Show the system prompt in a tall, multi-line box so it's readable and editable.
+            _systemPrompt.CustomControl = new TextBox
+            {
+                Multiline = true,
+                Height = 160,
+                WordWrap = true,
+                AcceptsReturn = true,
+                ScrollBars = ScrollBars.Vertical
+            };
             yield return _systemPrompt;
         }
 
