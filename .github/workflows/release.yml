@@ -3,9 +3,9 @@ name: Publish to NuGet
 # Publishes the plugin to nuget.org when you push a version tag, e.g.:
 #   git tag v0.1.0 && git push origin v0.1.0
 #
-# Prerequisite: add a repository secret named NUGET_PUSH_TOKEN
+# Prerequisite (one-time): add a repository secret named NUGET_PUSH_TOKEN
 # (Settings -> Secrets and variables -> Actions -> New repository secret)
-# containing a nuget.org API key allowed to push packages.
+# containing a nuget.org API key with the "Push" scope.
 
 on:
   push:

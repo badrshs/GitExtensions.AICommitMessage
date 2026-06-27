@@ -92,7 +92,9 @@ Once published, the package depends on `GitExtensions.Extensibility` — the mar
 
 Publishing is automated by [`.github/workflows/release.yml`](.github/workflows/release.yml):
 
-1. Add a repository secret **`NUGET_PUSH_TOKEN`** (a [nuget.org](https://www.nuget.org/) API key allowed to push).
+1. Create a [nuget.org](https://www.nuget.org/) API key with the **Push** scope (glob pattern `*`),
+   then add it to this repo as an Actions **secret** named **`NUGET_PUSH_TOKEN`**
+   (Settings → Secrets and variables → Actions → New repository secret).
 2. Tag a version and push it:
 
    ```sh
@@ -100,7 +102,7 @@ Publishing is automated by [`.github/workflows/release.yml`](.github/workflows/r
    git push origin v0.1.0
    ```
 
-The workflow fetches the matching Git Extensions binaries, packs the plugin, and pushes it to nuget.org.
+The workflow fetches the matching Git Extensions binaries, packs the plugin, and pushes to nuget.org.
 
 To build the package locally instead:
 
