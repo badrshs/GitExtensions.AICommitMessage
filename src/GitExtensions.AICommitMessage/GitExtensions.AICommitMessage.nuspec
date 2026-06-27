@@ -9,9 +9,11 @@
     <icon>Resources\icon.png</icon>
     <readme>README.md</readme>
     <tags>GitExtensions</tags>
-    <!-- The dependency on GitExtensions.Extensibility is the marker the Plugin Manager uses to discover plugins. -->
+    <!-- The dependency on GitExtensions.Extensibility is the marker the Plugin Manager uses to discover
+         plugins, AND the gate it filters on: the range must include the host's Extensibility version or
+         the plugin is hidden. GE 7.x ships Extensibility 7.0.x, so target the whole 7.x generation. -->
     <dependencies>
-      <dependency id="GitExtensions.Extensibility" version="[0.1.0, 1.0.0)" />
+      <dependency id="GitExtensions.Extensibility" version="[7.0.0, 8.0.0)" />
     </dependencies>
   </metadata>
   <files>

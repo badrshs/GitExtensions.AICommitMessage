@@ -54,7 +54,7 @@ namespace GitExtensions.AICommitMessage
         private readonly StringSetting _baseUrl = new("API base URL", "API base URL (OpenAI-compatible, e.g. https://api.openai.com/v1 or http://localhost:11434/v1)", "https://api.openai.com/v1");
         private readonly StringSetting _model = new("Model", "Model", "gpt-4o-mini");
         private readonly PasswordSetting _apiKey = new("API key", "API key (leave blank for local servers such as Ollama)", "");
-        private readonly StringSetting _systemPrompt = new("System prompt", "System prompt", DefaultSystemPrompt, useDefaultValueIfBlank: true);
+        private readonly StringSetting _systemPrompt = new("System prompt", "System prompt", DefaultSystemPrompt);
         private readonly NumberSetting<int> _maxDiffChars = new("Max diff characters", "Max diff characters sent to the model (0 = no limit)", 12000);
 
         private IGitModule? _module;
