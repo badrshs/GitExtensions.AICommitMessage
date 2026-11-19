@@ -96,6 +96,7 @@ Open **Settings → Plugins → AI Commit Message** and fill in the fields:
 | **Enabled** | Master switch. Off by default — turn this on first. |
 | **API base URL** | `https://api.openai.com/v1` (OpenAI), `http://localhost:11434/v1` (Ollama), or any OpenAI-compatible base. |
 | **Model** | e.g. `gpt-4o-mini`, `gpt-4o`, or your local model name. |
+| **Temperature** | Leave blank (default) to use the model's default and omit the temperature parameter. Only set a value if your model supports it: `0` to `2`, using a decimal point (e.g. `0.2`). |
 | **API key** | Masked. Leave blank for local servers that don't require auth. |
 | **Max diff characters** | Truncates the diff before sending (`0` = no limit). Default `12000`. |
 | **System prompt** | Steer the style. The default asks for a Conventional-Commits subject plus a body that explains *why*. |

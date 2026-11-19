@@ -53,6 +53,7 @@ namespace GitExtensions.AICommitMessage
         private readonly BoolSetting _enabled = new("Enabled", "Enable AI commit message generation", false);
         private readonly StringSetting _baseUrl = new("API base URL", "API base URL (OpenAI-compatible, e.g. https://api.openai.com/v1 or http://localhost:11434/v1)", "https://api.openai.com/v1");
         private readonly StringSetting _model = new("Model", "Model", "gpt-4o-mini");
+        private readonly StringSetting _temperature = new("Temperature", "Temperature (leave blank for model default; 0 to 2, e.g. 0.2; only set if supported by the model)", "");
         private readonly PasswordSetting _apiKey = new("API key", "API key (leave blank for local servers such as Ollama)", "");
         private readonly StringSetting _systemPrompt = new("System prompt", "System prompt", DefaultSystemPrompt);
         private readonly NumberSetting<int> _maxDiffChars = new("Max diff characters", "Max diff characters sent to the model (0 = no limit)", 12000);
@@ -73,6 +74,7 @@ namespace GitExtensions.AICommitMessage
             yield return _enabled;
             yield return _baseUrl;
             yield return _model;
+            yield return _temperature;
             yield return _apiKey;
             yield return _maxDiffChars;
 
@@ -227,6 +229,7 @@ namespace GitExtensions.AICommitMessage
             // Read settings on the UI thread.
             string baseUrl = _baseUrl.ValueOrDefault(Settings);
             string model = _model.ValueOrDefault(Settings);
+            string temperature = _temperature.ValueOrDefault(Settings);
             string apiKey = _apiKey.ValueOrDefault(Settings);
             string systemPrompt = _systemPrompt.ValueOrDefault(Settings);
             if (string.IsNullOrWhiteSpace(systemPrompt))
@@ -242,7 +245,7 @@ namespace GitExtensions.AICommitMessage
             try
             {
                 // Off the UI thread; the continuation resumes on the UI thread to update the form.
-                string message = await Task.Run(() => GenerateAsync(workingDir!, baseUrl, apiKey, model, systemPrompt, maxChars));
+                string message = await Task.Run(() => GenerateAsync(workingDir!, baseUrl, apiKey, model, temperature, systemPrompt, maxChars));
                 if (!string.IsNullOrEmpty(message))
                 {
                     SetCommitMessage(form, message);
@@ -267,7 +270,7 @@ namespace GitExtensions.AICommitMessage
             }
         }
 
-        private static async Task<string> GenerateAsync(string workingDir, string baseUrl, string apiKey, string model, string systemPrompt, int maxChars)
+        private static async Task<string> GenerateAsync(string workingDir, string baseUrl, string apiKey, string model, string temperature, string systemPrompt, int maxChars)
         {
             string diff = GitHelper.GetStagedDiff(workingDir);
             if (string.IsNullOrWhiteSpace(diff))
@@ -280,7 +283,7 @@ namespace GitExtensions.AICommitMessage
                 diff = diff.Substring(0, maxChars) + "\n\n[diff truncated to fit the configured limit]";
             }
 
-            OpenAiClient client = new(baseUrl, apiKey, model);
+            OpenAiClient client = new(baseUrl, apiKey, model, temperature);
             return await client.CompleteAsync(systemPrompt, diff).ConfigureAwait(false);
         }
 

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -18,12 +20,26 @@ namespace GitExtensions.AICommitMessage
         private readonly string _baseUrl;
         private readonly string _apiKey;
         private readonly string _model;
+        private readonly double? _temperature;
 
-        public OpenAiClient(string baseUrl, string apiKey, string model)
+        public OpenAiClient(string baseUrl, string apiKey, string model, string? temperature = null)
         {
             _baseUrl = (baseUrl ?? string.Empty).Trim().TrimEnd('/');
             _apiKey = (apiKey ?? string.Empty).Trim();
             _model = string.IsNullOrWhiteSpace(model) ? "gpt-4o-mini" : model.Trim();
+
+            if (!string.IsNullOrWhiteSpace(temperature))
+            {
+                if (!double.TryParse(temperature, NumberStyles.Float, CultureInfo.InvariantCulture, out double value)
+                    || !double.IsFinite(value) || value < 0 || value > 2)
+                {
+                    throw new ArgumentException(
+                        "Temperature must be blank (model default) or a number from 0 to 2 using a decimal point, such as 0.2.",
+                        nameof(temperature));
+                }
+
+                _temperature = value;
+            }
         }
 
         public async Task<string> CompleteAsync(string systemPrompt, string diff, CancellationToken cancellationToken = default)
@@ -34,16 +50,20 @@ namespace GitExtensions.AICommitMessage
                     "API base URL is not configured. Set it in Settings → Plugins → AI Commit Message.");
             }
 
-            var requestBody = new
+            var requestBody = new Dictionary<string, object>
             {
-                model = _model,
-                temperature = 0.2,
-                messages = new object[]
+                ["model"] = _model,
+                ["messages"] = new object[]
                 {
                     new { role = "system", content = systemPrompt },
                     new { role = "user", content = "Here is the staged git diff. Write the commit message for it:\n\n" + diff }
                 }
             };
+
+            if (_temperature.HasValue)
+            {
+                requestBody["temperature"] = _temperature.Value;
+            }
 
             string json = JsonSerializer.Serialize(requestBody);
 
